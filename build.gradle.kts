@@ -32,6 +32,8 @@ dependencies {
     implementation("io.ktor:ktor-server-sessions-jvm:$ktorVersion")
     implementation("io.ktor:ktor-server-html-builder-jvm:$ktorVersion")
     implementation("io.ktor:ktor-serialization-kotlinx-json-jvm:$ktorVersion")
+    implementation("org.mindrot:jbcrypt:0.4")
+
 
     // PostgreSQL driver
     implementation("org.postgresql:postgresql:42.6.0")
