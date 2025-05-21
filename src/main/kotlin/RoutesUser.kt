@@ -5,20 +5,29 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import kotlinx.serialization.Serializable
 import org.mindrot.jbcrypt.BCrypt
 import java.sql.SQLException
 
-@Serializable
-data class User(val pseudo: String, val password: String, val city: String = "")
-
-@Serializable
-data class UserResponse(val success: Boolean, val message: String)
+// Modèles importés
+import moteo_back.User
+import moteo_back.LoginRequest
+import moteo_back.UserResponse
 
 fun Route.userRoutes() {
     route("/users") {
 
-        // 🔐 Inscription avec hash du mot de passe
+        // Test bcrypt simple
+        get("/test-bcrypt") {
+            val password = "monMotDePasse123"
+            val hashedPassword = BCrypt.hashpw(password, BCrypt.gensalt())
+            val isPasswordValid = BCrypt.checkpw(password, hashedPassword)
+
+            call.respondText(
+                "Mot de passe: $password\nHash: $hashedPassword\nCheck password OK? $isPasswordValid"
+            )
+        }
+
+        // Inscription avec hash du mot de passe
         post("/register") {
             try {
                 val user = call.receive<User>()
@@ -33,15 +42,16 @@ fun Route.userRoutes() {
 
                 Database.connect().use { connection ->
                     val checkStatement = connection.prepareStatement("SELECT pseudo FROM users WHERE pseudo = ?")
-                    checkStatement.setString(1, user.pseudo)
-                    val resultSet = checkStatement.executeQuery()
-
-                    if (resultSet.next()) {
-                        call.respond(
-                            HttpStatusCode.Conflict,
-                            UserResponse(success = false, message = "Ce pseudo est déjà utilisé")
-                        )
-                        return@post
+                    checkStatement.use { stmt ->
+                        stmt.setString(1, user.pseudo)
+                        val resultSet = stmt.executeQuery()
+                        if (resultSet.next()) {
+                            call.respond(
+                                HttpStatusCode.Conflict,
+                                UserResponse(success = false, message = "Ce pseudo est déjà utilisé")
+                            )
+                            return@post
+                        }
                     }
 
                     val hashedPassword = BCrypt.hashpw(user.password, BCrypt.gensalt())
@@ -49,21 +59,23 @@ fun Route.userRoutes() {
                     val insertStatement = connection.prepareStatement(
                         "INSERT INTO users (pseudo, password, city) VALUES (?, ?, ?)"
                     )
-                    insertStatement.setString(1, user.pseudo)
-                    insertStatement.setString(2, hashedPassword)
-                    insertStatement.setString(3, user.city)
+                    insertStatement.use { stmt ->
+                        stmt.setString(1, user.pseudo)
+                        stmt.setString(2, hashedPassword)
+                        stmt.setString(3, user.city)
 
-                    val rowsAffected = insertStatement.executeUpdate()
-                    if (rowsAffected > 0) {
-                        call.respond(
-                            HttpStatusCode.Created,
-                            UserResponse(success = true, message = "Utilisateur créé avec succès")
-                        )
-                    } else {
-                        call.respond(
-                            HttpStatusCode.InternalServerError,
-                            UserResponse(success = false, message = "Échec de création de l'utilisateur")
-                        )
+                        val rowsAffected = stmt.executeUpdate()
+                        if (rowsAffected > 0) {
+                            call.respond(
+                                HttpStatusCode.Created,
+                                UserResponse(success = true, message = "Utilisateur créé avec succès")
+                            )
+                        } else {
+                            call.respond(
+                                HttpStatusCode.InternalServerError,
+                                UserResponse(success = false, message = "Échec de création de l'utilisateur")
+                            )
+                        }
                     }
                 }
             } catch (e: SQLException) {
@@ -79,12 +91,12 @@ fun Route.userRoutes() {
             }
         }
 
-        // 🔐 Connexion sécurisée avec comparaison de mot de passe hashé
+        // Connexion sécurisée — utilise LoginRequest ici
         post("/login") {
             try {
-                val user = call.receive<User>()
+                val loginRequest = call.receive<LoginRequest>()
 
-                if (user.pseudo.isBlank() || user.password.isBlank()) {
+                if (loginRequest.pseudo.isBlank() || loginRequest.password.isBlank()) {
                     call.respond(
                         HttpStatusCode.BadRequest,
                         UserResponse(success = false, message = "Pseudo et mot de passe requis")
@@ -96,33 +108,82 @@ fun Route.userRoutes() {
                     val statement = connection.prepareStatement(
                         "SELECT password FROM users WHERE pseudo = ?"
                     )
-                    statement.setString(1, user.pseudo)
-                    val resultSet = statement.executeQuery()
+                    statement.use { stmt ->
+                        stmt.setString(1, loginRequest.pseudo)
+                        val resultSet = stmt.executeQuery()
+                        if (resultSet.next()) {
+                            val storedHashedPassword = resultSet.getString("password")
 
-                    if (resultSet.next()) {
-                        val storedHashedPassword = resultSet.getString("password")
+                            if (BCrypt.checkpw(loginRequest.password, storedHashedPassword)) {
+                                call.respond(
+                                    HttpStatusCode.OK,
+                                    UserResponse(success = true, message = "Connexion réussie")
+                                )
+                            } else {
+                                call.respond(
+                                    HttpStatusCode.Unauthorized,
+                                    UserResponse(success = false, message = "Mot de passe incorrect")
+                                )
+                            }
+                        } else {
+                            call.respond(
+                                HttpStatusCode.NotFound,
+                                UserResponse(success = false, message = "Utilisateur introuvable")
+                            )
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    UserResponse(success = false, message = "Erreur: ${e.message}")
+                )
+            }
+        }
 
-                        if (BCrypt.checkpw(user.password, storedHashedPassword)) {
+        // Mise à jour utilisateur (avec hash du nouveau mot de passe)
+        put("/update") {
+            try {
+                val user = call.receive<User>()
+
+                if (user.pseudo.isBlank() || user.password.isBlank() || user.city.isBlank()) {
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        UserResponse(success = false, message = "Tous les champs sont obligatoires")
+                    )
+                    return@put
+                }
+
+                Database.connect().use { connection ->
+                    val hashedPassword = BCrypt.hashpw(user.password, BCrypt.gensalt())
+
+                    val updateStatement = connection.prepareStatement(
+                        "UPDATE users SET password = ?, city = ? WHERE pseudo = ?"
+                    )
+                    updateStatement.use { stmt ->
+                        stmt.setString(1, hashedPassword)
+                        stmt.setString(2, user.city)
+                        stmt.setString(3, user.pseudo)
+
+                        val rowsUpdated = stmt.executeUpdate()
+                        if (rowsUpdated > 0) {
                             call.respond(
                                 HttpStatusCode.OK,
-                                UserResponse(success = true, message = "Connexion réussie")
+                                UserResponse(success = true, message = "Utilisateur mis à jour avec succès")
                             )
                         } else {
                             call.respond(
-                                HttpStatusCode.Unauthorized,
-                                UserResponse(success = false, message = "Mot de passe incorrect")
+                                HttpStatusCode.NotFound,
+                                UserResponse(success = false, message = "Utilisateur non trouvé")
                             )
                         }
-                    } else {
-                        call.respond(
-                            HttpStatusCode.NotFound,
-                            UserResponse(success = false, message = "Utilisateur introuvable")
-                        )
                     }
-
-                    resultSet.close()
-                    statement.close()
                 }
+            } catch (e: SQLException) {
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    UserResponse(success = false, message = "Erreur de base de données: ${e.message}")
+                )
             } catch (e: Exception) {
                 call.respond(
                     HttpStatusCode.InternalServerError,

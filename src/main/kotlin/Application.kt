@@ -4,7 +4,7 @@ import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 
-fun main() {  // Retiré args: Array<String>
+fun main() {
     embeddedServer(
         Netty,
         port = 8080,
@@ -14,8 +14,7 @@ fun main() {  // Retiré args: Array<String>
 }
 
 fun Application.module() {
-    configureRouting()
-    configureSerialization()
-    configureSecurity()
+    configureSerialization()  // Toujours avant configureRouting pour que la sérialisation soit active pour les routes
+    configureSecurity()       // Configure ta sécurité (authentification etc.) si tu as ce module
+    configureRouting()        // Ensuite tes routes
 }
-
