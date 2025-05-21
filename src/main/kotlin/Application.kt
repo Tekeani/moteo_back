@@ -15,6 +15,6 @@ fun main() {
 
 fun Application.module() {
     configureSerialization()  // Toujours avant configureRouting pour que la sérialisation soit active pour les routes
-    configureSecurity()       // Configure ta sécurité (authentification etc.) si tu as ce module
-    configureRouting()        // Ensuite tes routes
+    configureSecurity()
+    configureRouting()
 }

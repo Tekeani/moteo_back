@@ -91,7 +91,7 @@ fun Route.userRoutes() {
             }
         }
 
-        // Connexion sécurisée — utilise LoginRequest ici
+        // Connection
         post("/login") {
             try {
                 val loginRequest = call.receive<LoginRequest>()
@@ -192,7 +192,7 @@ fun Route.userRoutes() {
             }
         }
 
-        // --- AJOUT DE LA ROUTE POUR RÉCUPÉRER LE PROFIL UTILISATEUR ---
+        // Récupère l'utilisateur
         get("/profile") {
             val pseudo = call.request.queryParameters["pseudo"]
             if (pseudo.isNullOrBlank()) {

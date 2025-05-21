@@ -12,17 +12,17 @@ data class User(
     val city: String
 )
 
-// Utilisé pour la connexion (pas besoin de "city")
+// Utilisé pour la connection
 @Serializable
 data class LoginRequest(
     val pseudo: String,
     val password: String
 )
 
-// Réponse standard de l'API pour User, avec pseudo optionnel
+// Réponse standard de l'API pour User
 @Serializable
 data class UserResponse(
     val success: Boolean,
     val message: String,
-    val pseudo: String? = null  // Champ optionnel ajouté
+    val pseudo: String? = null
 )

@@ -25,7 +25,7 @@ fun Application.configureRouting() {
         }
     }
 
-    // Déclaration des routes
+    // Déclaration des routes et test
     routing {
         get("/") {
             call.respondText("Hello from Moteo backend!")
@@ -43,8 +43,6 @@ fun Application.configureRouting() {
                 call.respondText("Database connection failed: ${e.message}", status = HttpStatusCode.InternalServerError)
             }
         }
-
-        // Inclusion des routes utilisateur (assure-toi que la fonction userRoutes() existe bien)
         userRoutes()
     }
 }
