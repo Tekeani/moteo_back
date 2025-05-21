@@ -191,5 +191,53 @@ fun Route.userRoutes() {
                 )
             }
         }
+
+        // --- AJOUT DE LA ROUTE POUR RÉCUPÉRER LE PROFIL UTILISATEUR ---
+        get("/profile") {
+            val pseudo = call.request.queryParameters["pseudo"]
+            if (pseudo.isNullOrBlank()) {
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    UserResponse(success = false, message = "Paramètre pseudo manquant")
+                )
+                return@get
+            }
+
+            try {
+                Database.connect().use { connection ->
+                    val statement = connection.prepareStatement(
+                        "SELECT pseudo, city FROM users WHERE pseudo = ?"
+                    )
+                    statement.use { stmt ->
+                        stmt.setString(1, pseudo)
+                        val resultSet = stmt.executeQuery()
+                        if (resultSet.next()) {
+                            val city = resultSet.getString("city")
+                            call.respond(
+                                HttpStatusCode.OK,
+                                UserProfileResponse(pseudo = pseudo, city = city)
+                            )
+                        } else {
+                            call.respond(
+                                HttpStatusCode.NotFound,
+                                UserResponse(success = false, message = "Utilisateur non trouvé")
+                            )
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    UserResponse(success = false, message = "Erreur serveur: ${e.message}")
+                )
+            }
+        }
     }
 }
+
+// Nouvelle classe pour la réponse du profil utilisateur
+@kotlinx.serialization.Serializable
+data class UserProfileResponse(
+    val pseudo: String,
+    val city: String
+)
