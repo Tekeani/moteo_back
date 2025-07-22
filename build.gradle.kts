@@ -14,10 +14,13 @@ application {
     mainClass.set("moteo_back.ApplicationKt")
 }
 
-
 repositories {
     mavenCentral()
     maven { url = uri("https://maven.pkg.jetbrains.space/public/p/ktor/eap") }
+}
+
+kotlin {
+    jvmToolchain(17) // ✅ Java 17 est compatible avec Kotlin 1.9.0
 }
 
 dependencies {
@@ -32,19 +35,16 @@ dependencies {
     implementation("io.ktor:ktor-server-sessions-jvm:$ktorVersion")
     implementation("io.ktor:ktor-server-html-builder-jvm:$ktorVersion")
     implementation("io.ktor:ktor-serialization-kotlinx-json-jvm:$ktorVersion")
+
     implementation("org.mindrot:jbcrypt:0.4")
-
-
-    // PostgreSQL driver
     implementation("org.postgresql:postgresql:42.6.0")
-
-    // Logback pour les logs
     implementation("ch.qos.logback:logback-classic:1.4.11")
-
-    // Sérialisation Kotlin
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
 
-    // Tests
     testImplementation("io.ktor:ktor-server-tests-jvm:$ktorVersion")
     testImplementation("org.jetbrains.kotlin:kotlin-test:1.9.0")
 }
+
+
+
+
